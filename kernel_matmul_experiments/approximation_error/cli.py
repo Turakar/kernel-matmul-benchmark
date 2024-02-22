@@ -72,12 +72,14 @@ def cli():
                 y=results[i, 1:],
                 mode="lines+markers",
                 line_color=px.colors.qualitative.T10[i],
+                line_width=1.5,
+                marker_size=5,
                 name=f"λ = {lengthscales[i]}",
             )
         )
         fig.add_hline(y=results[i, 0], line_dash="dash", line_color=px.colors.qualitative.T10[i])
     fig.add_hline(
-        y=gpytorch.settings.eval_cg_tolerance.value(), line_dash="dash", line_color="black"
+        y=gpytorch.settings.eval_cg_tolerance.value(), line_dash="dash", line_color="black", line_width=1.5
     )
     fig.update_xaxes(type="log", title="ϵ")
     fig.update_yaxes(
@@ -87,6 +89,13 @@ def cli():
     )
     fig.write_html("data/approximation_error.html")
     fig.update_layout(width=650, height=200, margin=dict(t=0, l=0, r=0, b=0))
+    font_size = 9
+    fig.update_layout(font_size=font_size, legend_font_size=font_size)
+    fig.update_annotations(font_size=font_size)
+    tickfont_size = int(0.8 * font_size)
+    fig.update_xaxes(tickfont_size=tickfont_size, title_font_size=font_size)
+    fig.update_yaxes(tickfont_size=tickfont_size, title_font_size=font_size)
+    fig.update_coloraxes(colorbar_tickfont_size=font_size)
     fig.write_image("data/approximation_error.svg")
 
 
