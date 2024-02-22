@@ -41,6 +41,7 @@ def run(path: str, iterations: int) -> None:
 
     # Setup
     tkwargs = dict(device="cuda", dtype=torch.float32)
+    num_compile_processes = params["settings"]["compile_processes"]
 
     # Setup progress bar
     progress = Progress(
@@ -57,10 +58,10 @@ def run(path: str, iterations: int) -> None:
     with (
         # Progress bar renderer
         Live(table),
-        # No gradients for this benchmark
+        # Disable autograd
         torch.no_grad(),
         # Passed to NativeFunction() for parallel compilation
-        multiprocessing.get_context("spawn").Pool(processes=10) as compile_pool,
+        multiprocessing.get_context("spawn").Pool(processes=num_compile_processes) as compile_pool,
     ):
         num_tasks = 0
         for method in params["methods"].keys():
@@ -105,19 +106,14 @@ def run(path: str, iterations: int) -> None:
                             status.update(Text(f"{method} cutoff={cutoff}"))
                             if impl is None:
                                 try:
-                                    method_params = copy.deepcopy(params["methods"][method])
-                                    if "max_size" in method_params:
-                                        del method_params["max_size"]
-                                    if "sparse" in method_params:
-                                        if method_params["sparse"]:
-                                            method_params["cutoff"] = cutoff
-                                        del method_params["sparse"]
+                                    method_params = params["methods"][method]
+                                    args = copy.deepcopy(method_params.get("args", {}))
+                                    if method_params.get("sparse", False):
+                                        args["cutoff"] = cutoff
                                     clz = getattr(implementations, method_params["class"])
                                     if clz == implementations.KernelMatmul:
-                                        method_params["compile_pool"] = compile_pool
-                                    del method_params["class"]
-                                    del method_params["name"]
-                                    impl = clz(**method_params)
+                                        args["compile_pool"] = compile_pool
+                                    impl = clz(**args)
                                 except Exception as e:
                                     if is_oom_exception(e):
                                         store[method][cutoff].value = torch.tensor([float("nan")])
@@ -133,8 +129,10 @@ def run(path: str, iterations: int) -> None:
                             )
                             if x is None:
                                 try:
-                                    if num_samples > params["methods"][method].get(
-                                        "max_size", float("inf")
+                                    if (
+                                        not params["methods"][method].get("sparse", False)
+                                        and num_samples
+                                        > params["params"]["num_samples"]["max_dense_size"]
                                     ):
                                         store[method][cutoff][num_samples].value = torch.tensor(
                                             [float("nan")]
@@ -229,13 +227,21 @@ def make_plots(path: str) -> None:
     store = HierarchicalStore.from_dict(torch.load(os.path.join(path, "output.pt")))
     with open(os.path.join(path, "params.toml"), "rb") as fd:
         params = tomllib.load(fd)
-    fig = plot.plot_ranking(store, params)
-    fig.write_html(os.path.join(path, "ranking.html"))
-    fig.write_image(os.path.join(path, "ranking.pdf"))
-    fig.show()
-
-    fig = plot.plot_ranking(store, params, only_dense=True)
-    fig.show()
+    fig = plot.plot_paper_figure(store, params)
+    fig.write_html(os.path.join(path, "benchmark.html"))
+    fig.update_layout(
+        width=650,
+        height=260,
+        margin=dict(l=0, r=0, t=12, b=0),
+    )
+    font_size = 9
+    fig.update_layout(font_size=font_size, legend_font_size=font_size)
+    fig.update_annotations(font_size=font_size)
+    tickfont_size = int(0.8 * font_size)
+    fig.update_xaxes(tickfont_size=tickfont_size, title_font_size=font_size)
+    fig.update_yaxes(tickfont_size=tickfont_size, title_font_size=font_size)
+    fig.update_coloraxes(colorbar_tickfont_size=font_size)
+    fig.write_image(os.path.join(path, "benchmark.svg"))
 
 
 if __name__ == "__main__":
