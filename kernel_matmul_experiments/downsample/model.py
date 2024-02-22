@@ -1,14 +1,15 @@
 from typing import Self
+
 import gpytorch
+import torch
+from gpytorch.distributions import MultivariateNormal
+from gpytorch.kernels import Kernel, SpectralMixtureKernel
+from gpytorch.likelihoods import GaussianLikelihood
+from gpytorch.means import ConstantMean
+from gpytorch.mlls import ExactMarginalLogLikelihood
 from gpytorch.models import ExactGP
 from kernel_matmul.util import find_periodogram_peaks
 from torch import Tensor
-from gpytorch.likelihoods import GaussianLikelihood
-from gpytorch.distributions import MultivariateNormal
-from gpytorch.means import ConstantMean
-from gpytorch.kernels import Kernel, SpectralMixtureKernel
-from gpytorch.mlls import ExactMarginalLogLikelihood
-import torch
 
 
 class SimpleGP(ExactGP):

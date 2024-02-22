@@ -1,9 +1,9 @@
-from ConfigSpace import ConfigurationSpace, Configuration
 import math
 
 import gpytorch
-from smac import Scenario, MultiFidelityFacade
 import torch
+from ConfigSpace import Configuration, ConfigurationSpace
+from smac import MultiFidelityFacade, Scenario
 
 from kernel_matmul_experiments.downsample.dataset_helper import TimeSeries
 from kernel_matmul_experiments.downsample.model import make_gp, train_gp
@@ -20,7 +20,7 @@ class SmacModel:
 
     @property
     def configspace(self) -> ConfigurationSpace:
-        from ConfigSpace import Categorical, Integer, Float, EqualsCondition
+        from ConfigSpace import Categorical, EqualsCondition, Float, Integer
 
         cs = ConfigurationSpace()
         lr = Float("lr", 1e-3, 1e0, log=True, default=1e-2)

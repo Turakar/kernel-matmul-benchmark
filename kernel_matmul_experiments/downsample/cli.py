@@ -1,12 +1,12 @@
 import click
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
 from kernel_matmul_experiments.downsample.dataset_helper import (
     downsample,
     load_monash,
     remove_train_from_val,
 )
-from plotly.subplots import make_subplots
-import plotly.graph_objects as go
-
 from kernel_matmul_experiments.downsample.hpo import do_hpo
 
 

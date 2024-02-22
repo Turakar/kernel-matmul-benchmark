@@ -3,13 +3,12 @@ import multiprocessing.pool
 
 import torch
 from gpytorch.kernels.kernel import sq_dist
+from kernel_matmul.configurations import MatmulAutotuneConfiguration
+from kernel_matmul.native_function import NativeFunction
+from kernel_matmul.ranges import make_ranges
 from pykeops.torch import LazyTensor
 from pykeops.torch.cluster import from_matrix
 from torch import Tensor
-
-from kernel_matmul.native_function import NativeFunction
-from kernel_matmul.ranges import make_ranges
-from kernel_matmul.configurations import MatmulAutotuneConfiguration
 
 
 class MatmulBase(abc.ABC):

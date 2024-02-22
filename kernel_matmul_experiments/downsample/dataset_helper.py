@@ -1,9 +1,10 @@
-from dataclasses import dataclass
 import datetime
-from torch import Tensor
+from dataclasses import dataclass
+
 import torch
-from datasets import load_dataset
 import torch_scatter
+from datasets import load_dataset
+from torch import Tensor
 
 
 @dataclass

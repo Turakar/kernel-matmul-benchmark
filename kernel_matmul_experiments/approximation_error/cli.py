@@ -1,20 +1,21 @@
+import math
 import multiprocessing
 import warnings
+
 import click
 import gpytorch
+import plotly.express as px
+import plotly.graph_objects as go
+import scipy.special
+import torch
 from kernel_matmul.linear_operator import KernelMatmulLinearOperator
 from kernel_matmul.ranges import make_ranges
-import torch
-import math
-from tqdm import tqdm
-from torch import Tensor
-from plotly.subplots import make_subplots
-import plotly.graph_objects as go
-from linear_operator.operators import LinearOperator, AddedDiagLinearOperator, DiagLinearOperator
-import scipy.special
 from linear_operator import settings
-import plotly.express as px
+from linear_operator.operators import AddedDiagLinearOperator, DiagLinearOperator, LinearOperator
 from linear_operator.utils.warnings import NumericalWarning
+from plotly.subplots import make_subplots
+from torch import Tensor
+from tqdm import tqdm
 
 
 @click.command()
@@ -79,7 +80,10 @@ def cli():
         )
         fig.add_hline(y=results[i, 0], line_dash="dash", line_color=px.colors.qualitative.T10[i])
     fig.add_hline(
-        y=gpytorch.settings.eval_cg_tolerance.value(), line_dash="dash", line_color="black", line_width=1.5
+        y=gpytorch.settings.eval_cg_tolerance.value(),
+        line_dash="dash",
+        line_color="black",
+        line_width=1.5,
     )
     fig.update_xaxes(type="log", title="ϵ")
     fig.update_yaxes(

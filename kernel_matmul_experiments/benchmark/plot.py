@@ -1,15 +1,15 @@
+import collections
 import math
 from typing import Callable
-import plotly.graph_objs as go
-from plotly.colors import sample_colorscale
+
 import numpy as np
-from plotly.subplots import make_subplots
-import collections
+import plotly.graph_objs as go
 import scipy.stats
 import torch
+from plotly.colors import sample_colorscale
+from plotly.subplots import make_subplots
 
 from kernel_matmul_experiments.benchmark.store import HierarchicalStore
-
 
 CATEGORICAL_COLORS = ["#fcde9c", "#ffa552", "#63b995", "#ced01f", "#7392b7", "#c4769e", "#ffffff"]
 
