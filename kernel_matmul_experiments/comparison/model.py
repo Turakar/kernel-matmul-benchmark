@@ -1,14 +1,18 @@
+import contextlib
+import warnings
 from typing import Self
 
 import gpytorch
 import torch
 from gpytorch.distributions import MultivariateNormal
-from gpytorch.kernels import Kernel, SpectralMixtureKernel
+from gpytorch.kernels import GridInterpolationKernel, Kernel, SpectralMixtureKernel
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.means import ConstantMean
 from gpytorch.mlls import ExactMarginalLogLikelihood
 from gpytorch.models import ExactGP
+from kernel_matmul.gpytorch import SpectralKernelMatmulKernel, SumKernel
 from kernel_matmul.util import find_periodogram_peaks
+from linear_operator.utils.warnings import NumericalWarning
 from torch import Tensor
 
 
@@ -26,6 +30,21 @@ class SimpleGP(ExactGP):
         return MultivariateNormal(mean_x, covar_x)
 
 
+class MonitorCG(contextlib.AbstractContextManager):
+    def __enter__(self):
+        self._context = warnings.catch_warnings(record=True, category=NumericalWarning)
+        self._catched = self._context.__enter__()
+        return self
+
+    def __exit__(self, *args):
+        self._context.__exit__(*args)
+        self._converged = len(self._catched) == 0
+
+    @property
+    def converged(self):
+        return self._converged
+
+
 def train_gp(
     model: SimpleGP, max_epochs: int = 200, lr: float = 0.01, convergence_atol: float = 1e-2
 ) -> None:
@@ -35,11 +54,14 @@ def train_gp(
 
     last_loss = None
     for _ in range(max_epochs):
-        optimizer.zero_grad(set_to_none=True)
-        output = model(*model.train_inputs)
-        loss = -mll(output, model.train_targets).sum()
-        loss.backward()
-        optimizer.step()
+        with MonitorCG() as monitor:
+            optimizer.zero_grad(set_to_none=True)
+            output = model(*model.train_inputs)
+            loss = -mll(output, model.train_targets).sum()
+            loss.backward()
+            optimizer.step()
+        if not monitor.converged:
+            break
         loss = loss.item()
         if last_loss is not None and abs(last_loss - loss) < convergence_atol:
             break
@@ -55,6 +77,26 @@ def init_naive_covar_module(peak_freqs: Tensor, peak_mags: Tensor, lengthscale: 
     kernel.mixture_means = peak_freqs[..., None, None]
     kernel.mixture_weights = peak_mags
     return kernel
+
+
+def init_ski_covar_module(peak_freqs: Tensor, peak_mags: Tensor, lengthscale: float) -> Kernel:
+    kernel = GridInterpolationKernel(
+        init_naive_covar_module(peak_freqs, peak_mags, lengthscale),
+        grid_size=10000,
+        num_dims=1,
+    )
+    return kernel
+
+
+def init_kernel_matmul_covar_module(
+    peak_freqs: Tensor, peak_mags: Tensor, lengthscale: float
+) -> Kernel:
+    kernel = SpectralKernelMatmulKernel(epsilon=1e-5, batch_shape=peak_freqs.shape)
+    kernel.lengthscale = torch.tensor(lengthscale)
+    kernel.raw_lengthscale.requires_grad = False
+    kernel.frequency = peak_freqs
+    kernel.outputscale = peak_mags
+    return SumKernel(kernel)
 
 
 class LogNormalPrior(gpytorch.priors.LogNormalPrior):
@@ -77,6 +119,7 @@ def make_gp(
     peak_distance: int,
     peak_oversample: int,
     noise: float,
+    method: str,
 ) -> SimpleGP:
     likelihood = GaussianLikelihood()
     likelihood.noise = noise
@@ -89,6 +132,13 @@ def make_gp(
         peak_distance,
         peak_oversample,
     )
-    kernel = init_naive_covar_module(peak_freqs, peak_mags, lengthscale)
+    if method == "naive":
+        kernel = init_naive_covar_module(peak_freqs, peak_mags, lengthscale)
+    elif method == "kernel-matmul":
+        kernel = init_kernel_matmul_covar_module(peak_freqs, peak_mags, lengthscale)
+    elif method == "ski":
+        kernel = init_ski_covar_module(peak_freqs, peak_mags, lengthscale)
+    else:
+        raise ValueError(f"Unknown method: {method}")
     model = SimpleGP(train_x, train_y, likelihood, kernel)
     return model
