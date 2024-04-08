@@ -89,7 +89,7 @@ class SmacModel:
 
 
 class NumMaxBudgetConfigs(Callback):
-    def __init__(self, max_n_configs: int | None):
+    def __init__(self, max_n_configs: int | None = None):
         super().__init__()
         self.max_n_configs = max_n_configs
         self.last_print = 0

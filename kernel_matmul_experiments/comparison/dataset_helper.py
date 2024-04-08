@@ -44,7 +44,7 @@ def load_monash(name: str = "traffic_hourly", split: str = "train") -> list[Time
         "australian_electricity_demand": 0.5 / 24,  # half-hourly data
         "traffic_hourly": 1 / 24,  # hourly data
     }[name]
-    dataset = load_dataset("monash_tsf", name=name, split=split)
+    dataset = load_dataset("monash_tsf", name=name, split=split, trust_remote_code=True)
     return [
         TimeSeries(
             start=series["start"],
@@ -71,7 +71,7 @@ def downsample(series: TimeSeries, from_size: int, to_size: int, method: str) ->
         selection = torch.sort(torch.randperm(from_window)[:to_size]).values
         return series[selection]
     elif method == "average":
-        import torch_scatter
+        import torch_scatter  # type: ignore
 
         bins = torch.linspace(series.x[-from_size], series.x[-1], to_size + 1)
         indices = torch.bucketize(series.x, bins)
