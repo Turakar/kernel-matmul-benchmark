@@ -167,7 +167,6 @@ def do_hpo(
     return {
         "name": name,
         "hpo_subset": hpo_subset,
-        "n_configs": n_configs,
         "incumbent": incumbent,
         "results": results,
     }

@@ -72,6 +72,7 @@ def downsample(series: TimeSeries, from_size: int, to_size: int, method: str) ->
         return series[selection]
     elif method == "average":
         import torch_scatter
+
         bins = torch.linspace(series.x[-from_size], series.x[-1], to_size + 1)
         indices = torch.bucketize(series.x, bins)
         new_x = (bins[:-1] + bins[1:]) / 2
