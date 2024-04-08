@@ -1,3 +1,5 @@
+import collections
+import json
 import os
 
 import click
@@ -23,20 +25,19 @@ def cli():
 
 
 @cli.command()
+@click.option("--base-path", type=click.Path(exists=True, dir_okay=True, file_okay=False), required=True)
 @click.option("--name", type=str, required=True)
 @click.option("--method", type=click.Choice(["naive", "kernel-matmul", "ski"]), required=True)
 @click.option("--hpo-subset-index", type=int, required=True)
 @click.option("--hpo-subset-size", type=int, default=10)
-@click.option("--base-path", type=str, required=True)
+@click.option("--results-path", type=str, required=True)
 def run(
-    name: str, method: str, hpo_subset_index: int, hpo_subset_size: int, base_path: str
+    base_path: str, name: str, method: str, hpo_subset_index: int, hpo_subset_size: int, results_path: str
 ) -> None:
-    out = os.path.join(base_path, name)
     train, val, test = load_data()
     hpo_subset = get_hpo_subset(len(train), hpo_subset_index, hpo_subset_size)
-    result = do_hpo(name, out, train, val, test, hpo_subset, method=method)
-    os.makedirs()
-    torch.save(result, os.path.join(out, "evaluation.pt"))
+    result = do_hpo(name, base_path, train, val, test, hpo_subset, method=method)
+    torch.save(result, results_path)
 
 
 @cli.command()
@@ -93,6 +94,21 @@ def slice_plot(base_path: str) -> None:
             fig.update_xaxes(type="log", row=1, col=i + 1)
     fig.update_yaxes(type="log")
     fig.show(renderer="browser")
+
+
+@cli.command()
+@click.argument("base-path", type=str)
+def analyze(base_path: str) -> None:
+    jobs_path = os.path.join(base_path, "jobs")
+    results_path = os.path.join(base_path, "results")
+    values = collections.defaultdict(list)
+    for filename in os.listdir(results_path):
+        job_id = int(filename[:-len(".pt")])
+        result = torch.load(os.path.join(results_path, filename))
+        with open(os.path.join(jobs_path, f"{job_id}.json")) as fd:
+            job = json.load(fd)
+        values[job["sweep"]["method"]].append(result["results"].nanmean().item())
+    print(values)
 
 
 def load_data() -> tuple[list[TimeSeries], list[TimeSeries], list[TimeSeries]]:

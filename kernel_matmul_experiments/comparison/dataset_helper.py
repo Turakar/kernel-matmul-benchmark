@@ -3,7 +3,6 @@ import datetime
 from dataclasses import dataclass
 
 import torch
-import torch_scatter
 from datasets import load_dataset
 from torch import Tensor
 from typing_extensions import Self
@@ -72,6 +71,7 @@ def downsample(series: TimeSeries, from_size: int, to_size: int, method: str) ->
         selection = torch.sort(torch.randperm(from_window)[:to_size]).values
         return series[selection]
     elif method == "average":
+        import torch_scatter
         bins = torch.linspace(series.x[-from_size], series.x[-1], to_size + 1)
         indices = torch.bucketize(series.x, bins)
         new_x = (bins[:-1] + bins[1:]) / 2

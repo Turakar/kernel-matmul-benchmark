@@ -123,12 +123,11 @@ def mean_absolute_scaled_error(
 
 def do_hpo(
     name: str,
-    out: str,
+    base_path: str,
     train: list[TimeSeries],
     val: list[TimeSeries],
     test: list[TimeSeries],
     hpo_subset: list[int],
-    n_configs: int = 100,
     method: str = "kernel-matmul",
 ) -> dict:
     model = SmacModel(
@@ -144,15 +143,15 @@ def do_hpo(
         instances=[str(i) for i in range(len(hpo_subset))],
         instance_features={str(i): [i] for i in range(len(hpo_subset))},
         name=name,
-        output_directory=Path(out) / "smac",
+        output_directory=Path(base_path) / "smac",
         use_default_config=True,
-        walltime_limit=60 * 60 * 2,  # 2 hours
+        walltime_limit=60 * 60 * 4,  # 4 hours
     )
     smac = MultiFidelityFacade(
         scenario,
         model.train,
         overwrite=False,
-        callbacks=[NumMaxBudgetConfigs(n_configs)],
+        callbacks=[NumMaxBudgetConfigs()],
     )
     with compile_pool(10):
         incumbent = smac.optimize()
