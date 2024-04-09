@@ -1,4 +1,5 @@
 import contextlib
+import math
 import warnings
 from typing import Self
 
@@ -9,7 +10,11 @@ from gpytorch.kernels import GridInterpolationKernel, Kernel, SpectralMixtureKer
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.means import ConstantMean
 from gpytorch.mlls import ExactMarginalLogLikelihood
-from gpytorch.models import ExactGP
+from gpytorch.models import ApproximateGP, ExactGP
+from gpytorch.variational import (
+    MeanFieldVariationalDistribution,
+    NNVariationalStrategy,
+)
 from kernel_matmul.gpytorch import SpectralKernelMatmulKernel, SumKernel
 from kernel_matmul.util import find_periodogram_peaks
 from linear_operator.utils.warnings import NumericalWarning
@@ -30,6 +35,39 @@ class SimpleGP(ExactGP):
         return MultivariateNormal(mean_x, covar_x)
 
 
+class VNNGP(ApproximateGP):
+    def __init__(
+        self,
+        train_x: Tensor,
+        train_y: Tensor,
+        likelihood: GaussianLikelihood,
+        covar_module: Kernel,
+        k: int = 256,
+        training_batch_size: int = 256,
+    ):
+        inducing_points = train_x.unsqueeze(-1).detach().clone()
+        variational_strategy = NNVariationalStrategy(
+            self,
+            inducing_points,
+            MeanFieldVariationalDistribution(inducing_points.shape[-2]),
+            k=k,
+            training_batch_size=training_batch_size,
+        )
+        super().__init__(variational_strategy)
+        self.mean_module = ConstantMean()
+        self.covar_module = covar_module
+        self.likelihood = likelihood
+        self.train_y = train_y
+
+    def forward(self, x: Tensor) -> MultivariateNormal:
+        mean_x = self.mean_module(x)
+        covar_x = self.covar_module(x)
+        return MultivariateNormal(mean_x, covar_x)
+
+    def __call__(self, x: Tensor | None, prior: bool = False, **kwargs):
+        return self.variational_strategy(x=x, prior=prior, **kwargs)
+
+
 class MonitorCG(contextlib.AbstractContextManager):
     def __enter__(self):
         self._context = warnings.catch_warnings(record=True, category=NumericalWarning)
@@ -38,26 +76,36 @@ class MonitorCG(contextlib.AbstractContextManager):
 
     def __exit__(self, *args):
         self._context.__exit__(*args)
-        self._converged = len(self._catched) == 0
 
     @property
     def converged(self):
-        return self._converged
+        return len(self._catched) == 0
 
 
 def train_gp(
-    model: SimpleGP, max_epochs: int = 200, lr: float = 0.01, convergence_atol: float = 1e-2
+    model: SimpleGP | VNNGP, max_epochs: int = 200, lr: float = 0.01, convergence_atol: float = 1e-2
 ) -> None:
     model.train()
     mll = ExactMarginalLogLikelihood(model.likelihood, model)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
+    max_steps = max_epochs
+    if isinstance(model, VNNGP):
+        batch_size = model.variational_strategy.training_batch_size
+        train_size = model.variational_strategy.M
+        max_steps *= math.ceil(train_size / batch_size)
+
     last_loss = None
-    for _ in range(max_epochs):
+    for _ in range(max_steps):
         with MonitorCG() as monitor:
             optimizer.zero_grad(set_to_none=True)
-            output = model(*model.train_inputs)
-            loss = -mll(output, model.train_targets).sum()
+            if isinstance(model, VNNGP):
+                output = model(x=None)
+                batch = model.variational_strategy.current_training_indices
+                loss = -mll(output, model.train_y[batch].to(output.mean.device)).sum()
+            else:
+                output = model(*model.train_inputs)
+                loss = -mll(output, model.train_targets).sum()
             loss.backward()
             optimizer.step()
         if not monitor.converged:
@@ -134,11 +182,15 @@ def make_gp(
     )
     if method == "naive":
         kernel = init_naive_covar_module(peak_freqs, peak_mags, lengthscale)
+        return SimpleGP(train_x, train_y, likelihood, kernel)
     elif method == "kernel-matmul":
         kernel = init_kernel_matmul_covar_module(peak_freqs, peak_mags, lengthscale)
+        return SimpleGP(train_x, train_y, likelihood, kernel)
     elif method == "ski":
         kernel = init_ski_covar_module(peak_freqs, peak_mags, lengthscale)
+        return SimpleGP(train_x, train_y, likelihood, kernel)
+    elif method == "vnngp":
+        kernel = init_naive_covar_module(peak_freqs, peak_mags, lengthscale)
+        return VNNGP(train_x, train_y, likelihood, kernel)
     else:
         raise ValueError(f"Unknown method: {method}")
-    model = SimpleGP(train_x, train_y, likelihood, kernel)
-    return model

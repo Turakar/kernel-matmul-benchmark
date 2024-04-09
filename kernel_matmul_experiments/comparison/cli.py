@@ -29,10 +29,15 @@ def cli():
     "--base-path", type=click.Path(exists=True, dir_okay=True, file_okay=False), required=True
 )
 @click.option("--name", type=str, required=True)
-@click.option("--method", type=click.Choice(["naive", "kernel-matmul", "ski"]), required=True)
+@click.option(
+    "--method", type=click.Choice(["naive", "kernel-matmul", "ski", "vnngp"]), required=True
+)
 @click.option("--hpo-subset-index", type=int, required=True)
 @click.option("--hpo-subset-size", type=int, default=10)
 @click.option("--results-path", type=str, required=True)
+@click.option(
+    "--timeout", type=float, default=4 * 60 * 60, help="Timeout for optimization in seconds."
+)
 def run(
     base_path: str,
     name: str,
@@ -40,10 +45,11 @@ def run(
     hpo_subset_index: int,
     hpo_subset_size: int,
     results_path: str,
+    timeout: float,
 ) -> None:
     train, val, test = load_data()
     hpo_subset = get_hpo_subset(len(train), hpo_subset_index, hpo_subset_size)
-    result = do_hpo(name, base_path, train, val, test, hpo_subset, method=method)
+    result = do_hpo(name, base_path, train, val, test, hpo_subset, method=method, timeout=timeout)
     torch.save(result, results_path)
 
 

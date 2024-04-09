@@ -16,6 +16,7 @@
             },
             "args": "${input:args}",
             "cwd": "${workspaceFolder}",
+            "pythonArgs": ["-Xfrozen_modules=off"]
         },
     ],
     "inputs": [

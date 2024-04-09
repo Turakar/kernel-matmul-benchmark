@@ -84,7 +84,8 @@ class SmacModel:
                     "ignore", category=linear_operator.utils.warnings.NumericalWarning
                 )
                 model.eval()
-                prediction = model(test.x.to(device)).mean.cpu() * std + mean
+                prediction_dist = model(test.x.to(device).unsqueeze(-1))
+                prediction = prediction_dist.mean.cpu() * std + mean
             return mean_absolute_scaled_error(test.y, prediction, train.y)
 
 
@@ -128,6 +129,7 @@ def do_hpo(
     val: list[TimeSeries],
     test: list[TimeSeries],
     hpo_subset: list[int],
+    timeout: float,
     method: str = "kernel-matmul",
 ) -> dict:
     model = SmacModel(
@@ -145,7 +147,7 @@ def do_hpo(
         name=name,
         output_directory=Path(base_path) / "smac",
         use_default_config=True,
-        walltime_limit=60 * 60 * 4,  # 4 hours
+        walltime_limit=timeout,
     )
     smac = MultiFidelityFacade(
         scenario,
