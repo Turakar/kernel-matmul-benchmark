@@ -1,3 +1,4 @@
+import contextlib
 import math
 import warnings
 from pathlib import Path
@@ -13,7 +14,7 @@ from smac.runhistory import TrialInfo, TrialValue
 from tqdm import tqdm
 
 from kernel_matmul_experiments.comparison.dataset_helper import TimeSeries
-from kernel_matmul_experiments.comparison.model import make_gp, train_gp
+from kernel_matmul_experiments.comparison.model import VNNGP, make_gp, train_gp
 
 
 class SmacModel:
@@ -79,10 +80,13 @@ class SmacModel:
                 gpytorch.settings.skip_posterior_variances(),
                 gpytorch.settings.max_cg_iterations(10000),
                 warnings.catch_warnings(),
+                contextlib.ExitStack() as stack,
             ):
                 warnings.filterwarnings(
                     "ignore", category=linear_operator.utils.warnings.NumericalWarning
                 )
+                if isinstance(model, VNNGP):
+                    stack.enter_context(gpytorch.settings.cholesky_jitter(1e-4))
                 model.eval()
                 prediction_dist = model(test.x.to(device).unsqueeze(-1))
                 prediction = prediction_dist.mean.cpu() * std + mean

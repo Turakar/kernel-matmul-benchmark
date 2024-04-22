@@ -39,10 +39,15 @@ class TimeSeries:
         return new_series
 
 
-def load_monash(name: str = "traffic_hourly", split: str = "train") -> list[TimeSeries]:
+def load_monash(
+    name: str, split: str = "train", min_series_length: int = 10000, max_size: int = 1000
+) -> list[TimeSeries]:
     dt = {
         "australian_electricity_demand": 0.5 / 24,  # half-hourly data
         "traffic_hourly": 1 / 24,  # hourly data
+        "solar_10_minutes": 10 / (60 * 24),  # 10-minute data
+        "electricity_hourly": 1 / 24,  # hourly data
+        "london_smart_meters": 0.5 / 24,  # half-hourly data
     }[name]
     dataset = load_dataset("monash_tsf", name=name, split=split, trust_remote_code=True)
     return [
@@ -56,10 +61,14 @@ def load_monash(name: str = "traffic_hourly", split: str = "train") -> list[Time
 
 
 def remove_train_from_val(train: TimeSeries, val: TimeSeries) -> TimeSeries:
-    assert torch.allclose(train.y, val.y[: len(train)]) and torch.allclose(
-        train.x, val.x[: len(train)]
-    )
+    assert torch.allclose(train.y, val.y[: len(train)])
+    assert torch.allclose(train.x, val.x[: len(train)])
     return val[len(train) :]
+
+
+def remove_nan(series: TimeSeries) -> TimeSeries:
+    good_mask = torch.isfinite(series.y)
+    return series[good_mask]
 
 
 def downsample(series: TimeSeries, from_size: int, to_size: int, method: str) -> TimeSeries:
