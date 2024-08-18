@@ -32,7 +32,7 @@ There is only a single file `cli.py` which runs the experiment and plots the res
 This experiment is quick to execute.
 
 ### Accuracy comparison
-Code is in `comparison/`.
+Code is in `kernel_matmul_experiments/comparison/`.
 
 - `cli.py`: Contains the code for running a single instance in the experiment (i.e., one of the HPOs) and for plotting the aggregate results.
 - `dataset_helper.py`: Loads the dataset and aids in splitting and pre-processing the dataset.
@@ -43,3 +43,8 @@ The comparison must be run on a cluster due to the high computational cost of th
 To aid in parallelization, each HPO is run in a separate process.
 For SLURM, you can build a custom batch script using the template provided in `sbatchx/`, which uses a tool named not released, yet.
 However, customization to your cluster is necessary anyway and should have low complexity.
+
+### Error of cutoff estimate
+The numerical study for the error of the cutoff estimate is under `kernel_matmul_experiments/cutoff/`.
+It consists of single file which runs the experiments and plots the results.
+This experiment is quick to execute.
