@@ -54,7 +54,7 @@ def main():
             col=i + 1,
         )
     fig.update_yaxes(title_text="Relative error", row=1, col=1)
-    fig.update_xaxes(title_text="Frequency f")
+    fig.update_xaxes(title_text="Frequency ν")
     fig.update_layout(showlegend=False)
     fig.write_html("data/cutoff.html")
     fig.update_layout(width=650, height=200, margin=dict(t=12, l=0, r=0, b=0))

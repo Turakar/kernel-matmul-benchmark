@@ -20,6 +20,8 @@ from kernel_matmul.util import find_periodogram_peaks
 from linear_operator.utils.warnings import NumericalWarning
 from torch import Tensor
 
+from kernel_matmul_experiments.comparison.spectral import KeOpsSpectralKernel
+
 
 class SimpleGP(ExactGP):
     def __init__(
@@ -150,9 +152,18 @@ def init_ski_covar_module(
 
 
 def init_kernel_matmul_covar_module(
-    peak_freqs: Tensor, peak_mags: Tensor, lengthscale: float
+    peak_freqs: Tensor, peak_mags: Tensor, lengthscale: float, epsilon: float = 1e-5
 ) -> Kernel:
-    kernel = SpectralKernelMatmulKernel(epsilon=1e-5, batch_shape=peak_freqs.shape)
+    kernel = SpectralKernelMatmulKernel(epsilon=epsilon, batch_shape=peak_freqs.shape)
+    kernel.lengthscale = torch.tensor(lengthscale)
+    kernel.raw_lengthscale.requires_grad = False
+    kernel.frequency = peak_freqs
+    kernel.outputscale = peak_mags
+    return SumKernel(kernel)
+
+
+def init_keops_covar_module(peak_freqs: Tensor, peak_mags: Tensor, lengthscale: float) -> Kernel:
+    kernel = KeOpsSpectralKernel(batch_shape=peak_freqs.shape)
     kernel.lengthscale = torch.tensor(lengthscale)
     kernel.raw_lengthscale.requires_grad = False
     kernel.frequency = peak_freqs
@@ -209,5 +220,11 @@ def make_gp(
     elif method == "vnngp":
         kernel = init_naive_covar_module(peak_freqs, peak_mags, lengthscale)
         return VNNGP(train_x, train_y, likelihood, kernel, **kwargs)
+    elif method == "keops":
+        kernel = init_keops_covar_module(peak_freqs, peak_mags, lengthscale)
+        return SimpleGP(train_x, train_y, likelihood, kernel, **kwargs)
+    elif method == "kernel-matmul-dense":
+        kernel = init_kernel_matmul_covar_module(peak_freqs, peak_mags, lengthscale)
+        return SimpleGP(train_x, train_y, likelihood, kernel, **kwargs)
     else:
         raise ValueError(f"Unknown method: {method}")

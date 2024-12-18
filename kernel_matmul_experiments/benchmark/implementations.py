@@ -233,3 +233,35 @@ class KeOpsMatmul(MatmulBase):
             )
             result = self.outputscale * result.reshape(self.outputscale.shape[0], -1, rhs.shape[-1])
             return result
+
+
+class BlockedNaiveMatmul(MatmulBase):
+    def __init__(self, block_size: int, cutoff: float) -> None:
+        super().__init__()
+        self.block_size = block_size
+        self.cutoff = cutoff
+
+    def prepare_train(self, x: Tensor, kernel_type: str) -> None:
+        assert kernel_type == "rbf"
+        start, end = make_ranges(self.cutoff, x, block_size=self.block_size, align=True)
+        self.x = x
+        self.start = start
+        self.end = end
+
+    def prepare_epoch(self, params: Tensor) -> None:
+        lengthscale = params[:, 0, None, None]
+        outputscale = params[:, 1, None, None]
+        self.kernels = []
+        for i, (start, end) in enumerate(zip(self.start, self.end)):
+            dist = sq_dist(
+                self.x[i * self.block_size : (i + 1) * self.block_size, None],
+                self.x[start:end, None],
+            )[None, :, :]
+            kernel = outputscale * (-0.5 * dist**2 / lengthscale**2).exp()
+            self.kernels.append(kernel)
+
+    def __call__(self, rhs: Tensor) -> Tensor:
+        results = []
+        for kernel, start, end in zip(self.kernels, self.start, self.end):
+            results.append(kernel @ rhs[:, start:end])
+        return torch.cat(results, dim=-2)

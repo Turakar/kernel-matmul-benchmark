@@ -212,9 +212,10 @@ def analyze(base_path: str, refresh: bool) -> None:
             )
 
     fig = make_subplots(
-        rows=1,
+        rows=2,
         cols=len(dataset_keys),
         subplot_titles=[human_readable_datasets[dataset] for dataset in dataset_keys],
+        vertical_spacing=0.05,
     )
     for i, dataset in enumerate(dataset_keys):
         for j, method in enumerate(method_keys):
@@ -235,12 +236,29 @@ def analyze(base_path: str, refresh: bool) -> None:
                 row=1,
                 col=i + 1,
             )
+            fig.add_trace(
+                go.Box(
+                    y=[4 * 60 * 60 / len(x["run_history"]) for x in values[dataset][method]],
+                    name=human_readable_methods[method],
+                    legendgroup=human_readable_methods[method],
+                    showlegend=False,
+                    marker_color=PLOT_COLORS[j],
+                    marker_size=2,
+                    line_width=1,
+                    boxpoints="all",
+                    jitter=0.5,
+                    pointpos=-2.0,
+                ),
+                row=2,
+                col=i + 1,
+            )
     fig.update_layout(showlegend=True, boxgap=0.5)
     fig.update_xaxes(showticklabels=False)
     fig.update_yaxes(title_text="Test MASE", row=1, col=1)
+    fig.update_yaxes(title_text="Seconds per trial", row=2, col=1)
     fig.write_html("data/comparison.html")
 
-    fig.update_layout(width=500, height=150, margin=dict(t=12, l=0, r=0, b=0))
+    fig.update_layout(width=500, height=250, margin=dict(t=12, l=0, r=0, b=0))
     font_size = 9
     fig.update_layout(font_size=font_size, legend_font_size=font_size)
     fig.update_annotations(font_size=font_size)

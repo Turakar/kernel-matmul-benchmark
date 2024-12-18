@@ -1,0 +1,28 @@
+#!/bin/bash
+
+#SBATCH --ntasks=1
+#SBATCH --time=12:00:00
+#SBATCH --job-name={{job_name}}
+#SBATCH --cpus-per-task=28
+#SBATCH --output={{sbatchx.base_path}}/slurm-output/%J.txt
+#SBATCH --mem-per-cpu=4G
+#SBATCH --partition=KathleenG
+#SBATCH --gres=gpu:1
+#SBATCH --qos=medium
+
+echo "Job started at $(date)"
+
+module purge
+module load GCCcore/12.2.0
+module load Python/3.11.2-GCCcore-12.2.0
+module load libffi/3.4.4-GCCcore-12.2.0
+module load CUDA/12.3.0
+module load Ninja/1.11.1-GCCcore-12.2.0
+module load SWIG/4.1.1-GCCcore-12.2.0
+
+poetry run python rebuttal/naive.py \
+    --hpo-subset-index {{sweep.hpo_subset_index}} \
+    --results-path {{sbatchx.base_path ~ "/results/" ~ sweep.dataset ~ "_" ~ sweep.hpo_subset_index ~ "_" ~ sbatchx.job_id ~ ".pt"}} \
+    --dataset {{sweep.dataset}}
+
+echo "Job finished at $(date)"

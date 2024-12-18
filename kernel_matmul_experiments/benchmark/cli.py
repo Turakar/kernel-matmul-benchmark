@@ -5,10 +5,8 @@ import operator
 import os
 
 import click
-import implementations
 import tomllib
 import torch
-from implementations import MatmulBase
 from rich.live import Live
 from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
 from rich.status import Status
@@ -16,7 +14,9 @@ from rich.table import Table
 from rich.text import Text
 from torch import Tensor
 
+import kernel_matmul_experiments.benchmark.implementations as implementations
 from kernel_matmul_experiments.benchmark import plot
+from kernel_matmul_experiments.benchmark.implementations import MatmulBase
 from kernel_matmul_experiments.benchmark.store import HierarchicalStore
 from kernel_matmul_experiments.benchmark.util import is_oom_exception, timeit
 
